@@ -10,7 +10,7 @@
     "install:all": "npm install && cd client && npm install && cd ../server && npm install"
   },
   "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=8.0.0"
+    "node": ">=22.15.0",
+    "npm": ">=11.15.0"
   }
 }
