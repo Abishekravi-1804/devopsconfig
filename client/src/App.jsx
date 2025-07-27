@@ -303,7 +303,7 @@ Requirements:
 
       {/* Footer */}
       <footer className="footer">
-        <p>🤖 Powered by Perplexity AI | Built with Vite + React</p>
+        <p> Devops config generator using api  </p>
       </footer>
     </div>
   );
