@@ -38,11 +38,10 @@ if (process.env.NODE_ENV === 'production') {
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    message: 'AI DevOps Generator API is running (AWS Bedrock Edition)',
+  res.status(200).json({ 
+    status: 'healthy', 
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    service: 'devops-config-generator'
   });
 });
 
