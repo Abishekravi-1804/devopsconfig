@@ -68,12 +68,14 @@ resource "aws_security_group" "app_sg" {
   vpc_id      = aws_vpc.main.id
 
   # SSH
-  ingress {
-    description = "SSH"
+ ingress {
+    description = "SSH from GitHub Actions"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = var.allowed_ssh_cidr
+    cidr_blocks = [
+      "0.0.0.0/0"  
+    ]
   }
 
   # HTTP

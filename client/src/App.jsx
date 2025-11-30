@@ -47,7 +47,7 @@ Requirements:
 - Include error handling where applicable`;
 
     try {
-      const response = await axios.post('http://localhost:3001/api/generate', { prompt, useCase });
+      const response = await axios.post('/api/generate', { prompt, useCase });
       const resultText = response.data.config;
       setGeneratedConfig(resultText);
 
