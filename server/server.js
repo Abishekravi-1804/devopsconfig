@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { OpenAI } from 'openai';
+import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
 import { config } from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -13,10 +13,11 @@ config();
 const app = express();
 const port = process.env.PORT || 3001;
 
-// Configure OpenAI client for Perplexity
-const client = new OpenAI({
-  apiKey: process.env.API_KEY,
-  baseURL: "https://api.perplexity.ai"
+// --- AWS BEDROCK CONFIGURATION ---
+// Initialize the Bedrock Client
+// Ensure AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION are in your .env file
+const client = new BedrockRuntimeClient({ 
+  region: process.env.AWS_REGION || "us-east-1" 
 });
 
 // CORS configuration for production
@@ -39,7 +40,7 @@ if (process.env.NODE_ENV === 'production') {
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
-    message: 'AI DevOps Generator API is running',
+    message: 'AI DevOps Generator API is running (AWS Bedrock Edition)',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   });
@@ -55,36 +56,69 @@ app.post('/api/generate', async (req, res) => {
     });
   }
 
-  if (!process.env.API_KEY) {
+  if (!process.env.AWS_ACCESS_KEY_ID) {
     return res.status(500).json({ 
-      error: 'Server configuration error: API key not found' 
+      error: 'Server configuration error: AWS credentials not found' 
     });
   }
 
   try {
     console.log(`[${new Date().toISOString()}] Generating ${useCase} for: ${prompt.substring(0, 50)}...`);
-    
-    const response = await client.chat.completions.create({
-      model: "sonar-pro",
+
+    // 1. Construct the payload for Claude 3 Haiku
+    // This is the specific format Anthropic models expect on Bedrock
+    const payload = {
+      anthropic_version: "bedrock-2023-05-31",
+      max_tokens: 1000,
+      system: "You are an expert DevOps engineer. Generate clean, well-commented, production-ready configurations and scripts following industry best practices.",
       messages: [
         {
-          role: "system", 
-          content: "You are an expert DevOps engineer. Generate clean, well-commented, production-ready configurations and scripts following industry best practices."
-        },
-        { role: "user", content: prompt }
+          role: "user",
+          content: [
+            { type: "text", text: prompt }
+          ]
+        }
       ],
-      max_tokens: 800,
       temperature: 0.3
+    };
+
+    // 2. Create the command
+    // Model ID: Claude 3 Haiku (Fastest & Cheapest)
+    const command = new InvokeModelCommand({
+      modelId: "anthropic.claude-3-haiku-20240307-v1:0",
+      contentType: "application/json",
+      accept: "application/json",
+      body: JSON.stringify(payload),
     });
 
-    const config = response.choices[0].message.content;
-    res.json({ config });
+    // 3. Invoke the model
+    const response = await client.send(command);
+
+    // 4. Decode and Parse Response
+    const decodedResponseBody = new TextDecoder().decode(response.body);
+    const responseBody = JSON.parse(decodedResponseBody);
+    
+    // Extract the text content
+    const configText = responseBody.content[0].text;
+
+    res.json({ config: configText });
     
     console.log(`[${new Date().toISOString()}] Successfully generated ${useCase}`);
+
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error generating config:`, error.message);
+    console.error(`[${new Date().toISOString()}] Error generating config:`, error);
+    
+    // Check for specific AWS errors
+    let errorMessage = 'Failed to generate configuration.';
+    if (error.name === 'AccessDeniedException') {
+      errorMessage = 'AWS Access Denied. Check your IAM permissions or Model Access.';
+    } else if (error.name === 'ThrottlingException') {
+      errorMessage = 'AWS Request Limit Exceeded. Try again later.';
+    }
+
     res.status(500).json({ 
-      error: 'Failed to generate configuration. Please check your API key and try again.' 
+      error: errorMessage,
+      details: error.message
     });
   }
 });
@@ -98,7 +132,7 @@ if (process.env.NODE_ENV === 'production') {
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`🚀 Server running at http://0.0.0.0:${port}`);
-  console.log(`🔑 API Key configured: ${process.env.API_KEY ? 'Yes' : 'No'}`);
+  console.log(`☁️  AWS Region: ${process.env.AWS_REGION || 'us-east-1'}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
